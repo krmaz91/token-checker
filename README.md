@@ -1,26 +1,30 @@
 # Solana Token Lens (MVP)
 
-Lightweight Solana token analyzer with no framework dependencies.
+Lightweight multi-chain token analyzer.
 
 ## Features
-- Solana, Ethereum, Base, Arbitrum token lookups via DexScreener
+- Solana, Ethereum, BNB Chain, Base, Arbitrum token lookups via DexScreener
 - Bitcoin (BTC) market data via CoinGecko
 - Holder count via HolderScan (optional API key, Solana only)
 - Mint/freeze authority via Helius RPC (optional API key, Solana only)
 - Simple risk scoring
 
-## Run locally
+## Local dev (Node server)
 ```bash
 node server.js
 ```
-
 Then open `http://localhost:3000`.
 
-## Environment variables (optional)
-```bash
-export HELIUS_API_KEY=your_key
-export HOLDERSCAN_API_KEY=your_key
-```
+## Netlify deployment
+This project is configured for Netlify with a serverless function.
+
+- Publish directory: `public`
+- Functions directory: `netlify/functions`
+- Endpoint: `/api/analyze`
+
+Set these environment variables in Netlify (optional but recommended):
+- `HELIUS_API_KEY`
+- `HOLDERSCAN_API_KEY`
 
 ## Notes
 - Without API keys, the app still returns DEX pricing and liquidity.
