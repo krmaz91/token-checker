@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Solana Token Lens</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Solana Token Lens</p>
+        <h1>Scan any Solana token in seconds.</h1>
+        <p class="subtitle">
+          Market cap, 24h move, holder count, and rug signals—collated from on-chain data and DEX liquidity.
+        </p>
+        <form id="lookup-form" class="lookup" autocomplete="off">
+          <select id="chain-select" name="chain" aria-label="Chain">
+            <option value="solana">Solana</option>
+            <option value="ethereum">Ethereum</option>
+            <option value="bsc">BNB Chain</option>
+            <option value="base">Base</option>
+            <option value="arbitrum">Arbitrum</option>
+            <option value="bitcoin">Bitcoin (BTC)</option>
+          </select>
+          <input
+            id="mint-input"
+            type="text"
+            name="mint"
+            placeholder="Paste token address"
+            spellcheck="false"
+          />
+          <button type="submit">Analyze</button>
+        </form>
+        <div class="actions">
+          <button id="demo-btn" type="button" class="ghost">Try Demo Mint</button>
+        </div>
+        <div class="hint">
+          Tip: For Bitcoin, leave the address empty to fetch BTC market data.
+        </div>
+      </section>
+
+      <section id="results" class="results hidden">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2 id="token-title">Token summary</h2>
+              <p id="token-mint" class="muted"></p>
+            </div>
+            <div id="risk-badge" class="risk">Risk</div>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <span class="label">Market Cap</span>
+              <span id="market-cap" class="value">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">24h Change</span>
+              <span id="daily-change" class="value">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Holders</span>
+              <span id="holders" class="value">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Liquidity</span>
+              <span id="liquidity" class="value">—</span>
+            </div>
+          </div>
+
+          <div class="detail-grid">
+            <div class="detail">
+              <h3>Authorities</h3>
+              <p id="authorities">—</p>
+            </div>
+            <div class="detail">
+              <h3>DEX Pair</h3>
+              <p id="dex-pair">—</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Risk Signals</h3>
+          <ul id="risk-list" class="risk-list"></ul>
+          <p id="risk-note" class="muted"></p>
+        </div>
+      </section>
+
+      <section id="status" class="status"></section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
