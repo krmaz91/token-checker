@@ -10,11 +10,17 @@ const marketCap = document.getElementById("market-cap");
 const dailyChange = document.getElementById("daily-change");
 const holders = document.getElementById("holders");
 const liquidity = document.getElementById("liquidity");
+const volume7d = document.getElementById("volume-7d");
+const volume30d = document.getElementById("volume-30d");
+const firstMinted = document.getElementById("first-minted");
 const authorities = document.getElementById("authorities");
 const dexPair = document.getElementById("dex-pair");
 const riskBadge = document.getElementById("risk-badge");
 const riskList = document.getElementById("risk-list");
 const riskNote = document.getElementById("risk-note");
+const newsList = document.getElementById("news-list");
+const chartFrame = document.getElementById("dex-chart");
+const chartLink = document.getElementById("chart-link");
 const demoBtn = document.getElementById("demo-btn");
 
 function updatePlaceholder() {
@@ -48,19 +54,64 @@ function formatPercent(value) {
   return `${sign}${value.toFixed(2)}%`;
 }
 
+function formatDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+}
+
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
   statusEl.style.color = isError ? "#c0432d" : "";
 }
 
+function renderNews(items) {
+  newsList.innerHTML = "";
+
+  if (!Array.isArray(items) || items.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No recent token-specific headlines found.";
+    newsList.appendChild(li);
+    return;
+  }
+
+  items.forEach((item) => {
+    const li = document.createElement("li");
+    const source = item.source || "Unknown";
+    const when = item.publishedAt ? new Date(item.publishedAt).toLocaleDateString("en-US") : "";
+
+    if (item.url) {
+      const link = document.createElement("a");
+      link.href = item.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = item.title || "Read article";
+      li.appendChild(link);
+    } else {
+      li.textContent = item.title || "Untitled article";
+    }
+
+    const meta = document.createElement("p");
+    meta.className = "muted";
+    meta.textContent = when ? `${source} • ${when}` : source;
+    li.appendChild(meta);
+    newsList.appendChild(li);
+  });
+}
+
 function renderResult(data) {
-  tokenTitle.textContent = data?.dexPair?.baseToken?.symbol || "Token summary";
+  tokenTitle.textContent = data?.dexPair?.baseToken?.symbol || (data.chain === "bitcoin" ? "Bitcoin" : "Token summary");
   tokenMint.textContent = data.mint;
 
   marketCap.textContent = formatCurrency(data.marketCapUsd);
   dailyChange.textContent = formatPercent(data.dailyChangePercent);
-  holders.textContent = data.holders === null ? "Requires HolderScan API" : formatNumber(data.holders);
+  holders.textContent =
+    data.chain !== "solana" ? "N/A" : data.holders === null ? "Requires HolderScan API" : formatNumber(data.holders);
   liquidity.textContent = data.dexPair ? formatCurrency(data.dexPair.liquidityUsd) : "—";
+  volume7d.textContent = formatCurrency(data.volume7dUsd);
+  volume30d.textContent = formatCurrency(data.volume30dUsd);
+  firstMinted.textContent = formatDate(data.firstMintedAt);
 
   const mintAuth = data.mintAuthority ? "Enabled" : "Disabled";
   const freezeAuth = data.freezeAuthority ? "Enabled" : "Disabled";
@@ -95,6 +146,18 @@ function renderResult(data) {
     });
   }
 
+  if (data.chart?.embedUrl) {
+    chartFrame.src = data.chart.embedUrl;
+    chartLink.href = data.chart.dexUrl || "#";
+    chartLink.textContent = "Open on DexScreener";
+  } else {
+    chartFrame.src = "about:blank";
+    chartLink.href = "#";
+    chartLink.textContent = "Live chart unavailable for this asset";
+  }
+
+  renderNews(data.news || []);
+
   const sourceNotes = [];
   if (data.chain === "solana") {
     if (!data.sources.holderScan) sourceNotes.push("holder count");
@@ -102,7 +165,7 @@ function renderResult(data) {
   }
   riskNote.textContent = sourceNotes.length
     ? `Missing ${sourceNotes.join(" & ")} data. Add API keys to improve accuracy.`
-    : "All data sources are active.";
+    : "All configured data sources are active.";
 
   results.classList.remove("hidden");
 }
@@ -117,9 +180,7 @@ form.addEventListener("submit", async (event) => {
   results.classList.add("hidden");
 
   try {
-    const response = await fetch(
-      `/api/analyze?chain=${encodeURIComponent(chain)}&mint=${encodeURIComponent(mint)}`
-    );
+    const response = await fetch(`/api/analyze?chain=${encodeURIComponent(chain)}&mint=${encodeURIComponent(mint)}`);
     const data = await response.json();
 
     if (!response.ok) {

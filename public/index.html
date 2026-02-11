@@ -67,6 +67,18 @@
               <span class="label">Liquidity</span>
               <span id="liquidity" class="value">—</span>
             </div>
+            <div class="stat">
+              <span class="label">Volume (7d)</span>
+              <span id="volume-7d" class="value">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Volume (1m)</span>
+              <span id="volume-30d" class="value">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">First Minted</span>
+              <span id="first-minted" class="value">—</span>
+            </div>
           </div>
 
           <div class="detail-grid">
@@ -82,9 +94,22 @@
         </div>
 
         <div class="card">
+          <h3>Live Graph</h3>
+          <div class="chart-wrap">
+            <iframe id="dex-chart" title="DexScreener chart" loading="lazy"></iframe>
+          </div>
+          <p class="muted"><a id="chart-link" href="#" target="_blank" rel="noopener noreferrer">Open on DexScreener</a></p>
+        </div>
+
+        <div class="card">
           <h3>Risk Signals</h3>
           <ul id="risk-list" class="risk-list"></ul>
           <p id="risk-note" class="muted"></p>
+        </div>
+
+        <div class="card">
+          <h3>Token News (last 7d)</h3>
+          <ul id="news-list" class="news-list"></ul>
         </div>
       </section>
 
