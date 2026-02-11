@@ -9,6 +9,7 @@ Lightweight multi-chain token analyzer.
 - Embedded DexScreener live chart
 - First minted/first seen timestamp (Solana prefers earliest on-chain activity when Helius is set)
 - Token-related news aggregation (Google News RSS query)
+- Market signals: buys/sells (5m, 1h, 24h), price change windows (5m/1h/6h/24h), liquidity/mcap ratio, pool age, 24h vs 7d volume trend, 7d volatility
 - Holder count via HolderScan (optional API key, Solana only)
 - Mint/freeze authority via Helius RPC (optional API key, Solana only)
 - Simple risk scoring

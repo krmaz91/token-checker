@@ -105,12 +105,15 @@ async function fetchDexScreener(mint) {
 
 async function fetchHolderCount(mint) {
   if (!HOLDERSCAN_API_KEY) return null;
-  const response = await fetch(`https://api.holderscan.com/v0/solana/tokens/${mint}/holders?limit=1`, {
+  const response = await fetch(`https://api.holderscan.com/v0/sol/tokens/${mint}/holders?limit=1`, {
     headers: { "X-API-KEY": HOLDERSCAN_API_KEY },
   });
   if (!response.ok) throw new Error(`HolderScan error: ${response.status}`);
   const data = await response.json();
-  return typeof data?.total === "number" ? data.total : null;
+  if (typeof data?.holder_count === "number") return data.holder_count;
+  if (typeof data?.total_holders === "number") return data.total_holders;
+  if (typeof data?.total === "number") return data.total;
+  return null;
 }
 
 async function fetchHeliusMintAuthorities(mint) {
@@ -167,25 +170,38 @@ async function fetchEarliestSolanaActivity(mint) {
 
 async function fetchPoolVolumes(chain, pairAddress) {
   const network = geckoNetworkFromChain(chain);
-  if (!network || !pairAddress) return { volume7dUsd: null, volume30dUsd: null };
+  if (!network || !pairAddress) return { volume7dUsd: null, volume30dUsd: null, volatility7dPercent: null };
 
   const url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${pairAddress}/ohlcv/day?limit=30`;
   const response = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!response.ok) return { volume7dUsd: null, volume30dUsd: null };
+  if (!response.ok) return { volume7dUsd: null, volume30dUsd: null, volatility7dPercent: null };
 
   const data = await response.json();
   const list = data?.data?.attributes?.ohlcv_list;
   if (!Array.isArray(list) || list.length === 0) {
-    return { volume7dUsd: null, volume30dUsd: null };
+    return { volume7dUsd: null, volume30dUsd: null, volatility7dPercent: null };
   }
 
   const volumeRows = list.map((row) => Number(Array.isArray(row) ? row[5] : 0)).filter((v) => Number.isFinite(v));
+  const volatilityRows = list
+    .slice(0, 7)
+    .map((row) => {
+      if (!Array.isArray(row)) return null;
+      const open = Number(row[1]);
+      const high = Number(row[2]);
+      const low = Number(row[3]);
+      if (!Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || open <= 0) return null;
+      return ((high - low) / open) * 100;
+    })
+    .filter((v) => v !== null);
   const latest30 = volumeRows.slice(0, 30);
   const latest7 = latest30.slice(0, 7);
 
   return {
     volume7dUsd: latest7.reduce((sum, v) => sum + v, 0) || null,
     volume30dUsd: latest30.reduce((sum, v) => sum + v, 0) || null,
+    volatility7dPercent:
+      volatilityRows.length > 0 ? volatilityRows.reduce((sum, v) => sum + v, 0) / volatilityRows.length : null,
   };
 }
 
@@ -217,6 +233,44 @@ function buildChartUrls(bestPair) {
   return { dexUrl, embedUrl: `${dexUrl}?embed=1&theme=light` };
 }
 
+function computePoolAgeDays(pairCreatedAt) {
+  if (!pairCreatedAt) return null;
+  const created = new Date(pairCreatedAt).getTime();
+  if (!Number.isFinite(created)) return null;
+  const diffMs = Date.now() - created;
+  if (diffMs < 0) return 0;
+  return diffMs / (1000 * 60 * 60 * 24);
+}
+
+function buildMarketSignals({ bestPair, marketCapUsd, volume24hUsd, volume7dUsd, volatility7dPercent }) {
+  const txns = bestPair?.txns || {};
+  const priceChange = bestPair?.priceChange || {};
+  const liquidityUsd = Number(bestPair?.liquidity?.usd || 0) || null;
+  const liquidityToMcapRatio = liquidityUsd && marketCapUsd ? liquidityUsd / marketCapUsd : null;
+  const avgDailyVolume7dUsd = volume7dUsd ? volume7dUsd / 7 : null;
+  const volumeTrend24hVs7dRatio =
+    avgDailyVolume7dUsd && volume24hUsd ? volume24hUsd / avgDailyVolume7dUsd : null;
+
+  return {
+    txns: {
+      m5: txns.m5 || null,
+      h1: txns.h1 || null,
+      h24: txns.h24 || null,
+    },
+    priceChangePercent: {
+      m5: Number(priceChange.m5 ?? NaN),
+      h1: Number(priceChange.h1 ?? NaN),
+      h6: Number(priceChange.h6 ?? NaN),
+      h24: Number(priceChange.h24 ?? NaN),
+    },
+    liquidityToMcapRatio,
+    poolAgeDays: computePoolAgeDays(bestPair?.pairCreatedAt),
+    avgDailyVolume7dUsd,
+    volumeTrend24hVs7dRatio,
+    volatility7dPercent,
+  };
+}
+
 async function analyzeToken(chain, mint) {
   if (chain === "bitcoin") {
     if (mint) {
@@ -238,6 +292,15 @@ async function analyzeToken(chain, mint) {
         volume24hUsd: market?.total_volume?.usd ?? null,
         volume7dUsd: null,
         volume30dUsd: null,
+        marketSignals: {
+          txns: { m5: null, h1: null, h24: null },
+          priceChangePercent: { m5: null, h1: null, h6: null, h24: market?.price_change_percentage_24h ?? null },
+          liquidityToMcapRatio: null,
+          poolAgeDays: null,
+          avgDailyVolume7dUsd: null,
+          volumeTrend24hVs7dRatio: null,
+          volatility7dPercent: null,
+        },
         firstMintedAt: btc?.genesis_date ? new Date(btc.genesis_date).toISOString() : null,
         holders: null,
         mintAuthority: null,
@@ -268,6 +331,8 @@ async function analyzeToken(chain, mint) {
 
   const bestPair = pickBestPair(dexData?.pairs || []);
   const volumes = await fetchPoolVolumes(chain, bestPair?.pairAddress);
+  const marketCapUsd = Number(bestPair?.fdv || bestPair?.marketCap || 0) || null;
+  const volume24hUsd = Number(bestPair?.volume?.h24 || 0) || null;
   const firstMintedAt = isSolana
     ? (await fetchEarliestSolanaActivity(mint)) || (bestPair?.pairCreatedAt ? new Date(bestPair.pairCreatedAt).toISOString() : null)
     : bestPair?.pairCreatedAt
@@ -291,17 +356,26 @@ async function analyzeToken(chain, mint) {
 
   const chart = buildChartUrls(bestPair);
 
+  const marketSignals = buildMarketSignals({
+    bestPair,
+    marketCapUsd,
+    volume24hUsd,
+    volume7dUsd: volumes.volume7dUsd,
+    volatility7dPercent: volumes.volatility7dPercent,
+  });
+
   return {
     status: 200,
     body: {
       chain,
       mint,
       priceUsd: Number(bestPair?.priceUsd || 0),
-      marketCapUsd: Number(bestPair?.fdv || bestPair?.marketCap || 0) || null,
+      marketCapUsd,
       dailyChangePercent: Number(bestPair?.priceChange?.h24 || 0),
-      volume24hUsd: Number(bestPair?.volume?.h24 || 0) || null,
+      volume24hUsd,
       volume7dUsd: volumes.volume7dUsd,
       volume30dUsd: volumes.volume30dUsd,
+      marketSignals,
       firstMintedAt,
       holders: holderCount,
       mintAuthority: authorityInfo.mintAuthority,

@@ -23,9 +23,9 @@ body {
 }
 
 .shell {
-  max-width: 980px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 56px 24px 72px;
+  padding: 48px 28px 72px;
   display: grid;
   gap: 32px;
 }
@@ -140,6 +140,7 @@ h1 {
 .results {
   display: grid;
   gap: 24px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
 }
 
 .card {
@@ -147,6 +148,7 @@ h1 {
   padding: 28px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  grid-column: span 12;
 }
 
 .card-head {
@@ -266,8 +268,57 @@ h1 {
   color: var(--muted);
 }
 
+.signals-table {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+
+.signal-row {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.signal-row span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.signal-row strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+
 .hidden {
   display: none;
+}
+
+@media (min-width: 980px) {
+  .results .card:first-child {
+    grid-column: span 8;
+  }
+
+  .results .card:nth-child(2) {
+    grid-column: span 4;
+  }
+
+  .results .card:nth-child(3) {
+    grid-column: span 6;
+  }
+
+  .results .card:nth-child(4) {
+    grid-column: span 6;
+  }
+
+  .results .card:nth-child(5) {
+    grid-column: span 12;
+  }
 }
 
 @media (max-width: 720px) {
@@ -277,5 +328,9 @@ h1 {
 
   .card-head {
     flex-direction: column;
+  }
+
+  .signals-table {
+    grid-template-columns: 1fr;
   }
 }

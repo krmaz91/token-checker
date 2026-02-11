@@ -8,11 +8,22 @@ const tokenTitle = document.getElementById("token-title");
 const tokenMint = document.getElementById("token-mint");
 const marketCap = document.getElementById("market-cap");
 const dailyChange = document.getElementById("daily-change");
-const holders = document.getElementById("holders");
+const volume24h = document.getElementById("volume-24h");
 const liquidity = document.getElementById("liquidity");
 const volume7d = document.getElementById("volume-7d");
 const volume30d = document.getElementById("volume-30d");
 const firstMinted = document.getElementById("first-minted");
+const txns5m = document.getElementById("txns-5m");
+const txns1h = document.getElementById("txns-1h");
+const txns24h = document.getElementById("txns-24h");
+const price5m = document.getElementById("price-5m");
+const price1h = document.getElementById("price-1h");
+const price6h = document.getElementById("price-6h");
+const price24h = document.getElementById("price-24h");
+const liqMcapRatio = document.getElementById("liq-mcap-ratio");
+const poolAge = document.getElementById("pool-age");
+const volumeTrend = document.getElementById("volume-trend");
+const volatility7d = document.getElementById("volatility-7d");
 const authorities = document.getElementById("authorities");
 const dexPair = document.getElementById("dex-pair");
 const riskBadge = document.getElementById("risk-badge");
@@ -35,23 +46,30 @@ function updatePlaceholder() {
 }
 
 function formatCurrency(value) {
-  if (value === null || Number.isNaN(value)) return "—";
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+  const normalized = Number(value);
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: value < 1 ? 6 : 2,
-  }).format(value);
+    maximumFractionDigits: normalized < 1 ? 6 : 2,
+  }).format(normalized);
 }
 
 function formatNumber(value) {
-  if (value === null || Number.isNaN(value)) return "—";
-  return new Intl.NumberFormat("en-US").format(value);
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+  return new Intl.NumberFormat("en-US").format(Number(value));
 }
 
 function formatPercent(value) {
-  if (value === null || Number.isNaN(value)) return "—";
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${value.toFixed(2)}%`;
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+  const normalized = Number(value);
+  const sign = normalized > 0 ? "+" : "";
+  return `${sign}${normalized.toFixed(2)}%`;
+}
+
+function formatMultiplier(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+  return `${Number(value).toFixed(2)}x`;
 }
 
 function formatDate(value) {
@@ -101,17 +119,39 @@ function renderNews(items) {
 }
 
 function renderResult(data) {
+  const marketSignals = data.marketSignals || {};
   tokenTitle.textContent = data?.dexPair?.baseToken?.symbol || (data.chain === "bitcoin" ? "Bitcoin" : "Token summary");
   tokenMint.textContent = data.mint;
 
   marketCap.textContent = formatCurrency(data.marketCapUsd);
   dailyChange.textContent = formatPercent(data.dailyChangePercent);
-  holders.textContent =
-    data.chain !== "solana" ? "N/A" : data.holders === null ? "Requires HolderScan API" : formatNumber(data.holders);
+  volume24h.textContent = formatCurrency(data.volume24hUsd);
   liquidity.textContent = data.dexPair ? formatCurrency(data.dexPair.liquidityUsd) : "—";
   volume7d.textContent = formatCurrency(data.volume7dUsd);
   volume30d.textContent = formatCurrency(data.volume30dUsd);
   firstMinted.textContent = formatDate(data.firstMintedAt);
+  txns5m.textContent = marketSignals.txns
+    ? `${formatNumber(marketSignals.txns.m5?.buys)} / ${formatNumber(marketSignals.txns.m5?.sells)}`
+    : "—";
+  txns1h.textContent = marketSignals.txns
+    ? `${formatNumber(marketSignals.txns.h1?.buys)} / ${formatNumber(marketSignals.txns.h1?.sells)}`
+    : "—";
+  txns24h.textContent = marketSignals.txns
+    ? `${formatNumber(marketSignals.txns.h24?.buys)} / ${formatNumber(marketSignals.txns.h24?.sells)}`
+    : "—";
+  price5m.textContent = marketSignals.priceChangePercent ? formatPercent(marketSignals.priceChangePercent.m5) : "—";
+  price1h.textContent = marketSignals.priceChangePercent ? formatPercent(marketSignals.priceChangePercent.h1) : "—";
+  price6h.textContent = marketSignals.priceChangePercent ? formatPercent(marketSignals.priceChangePercent.h6) : "—";
+  price24h.textContent = marketSignals.priceChangePercent ? formatPercent(marketSignals.priceChangePercent.h24) : "—";
+  liqMcapRatio.textContent = formatPercent(
+    marketSignals.liquidityToMcapRatio === null ? null : marketSignals.liquidityToMcapRatio * 100
+  );
+  poolAge.textContent =
+    marketSignals.poolAgeDays === null || Number.isNaN(marketSignals.poolAgeDays)
+      ? "—"
+      : `${marketSignals.poolAgeDays.toFixed(1)} days`;
+  volumeTrend.textContent = formatMultiplier(marketSignals.volumeTrend24hVs7dRatio);
+  volatility7d.textContent = formatPercent(marketSignals.volatility7dPercent);
 
   const mintAuth = data.mintAuthority ? "Enabled" : "Disabled";
   const freezeAuth = data.freezeAuthority ? "Enabled" : "Disabled";
@@ -120,7 +160,7 @@ function renderResult(data) {
   } else {
     authorities.textContent =
       data.mintAuthority === null && data.freezeAuthority === null
-        ? "Requires Helius API"
+        ? "Unavailable"
         : `Mint: ${mintAuth} • Freeze: ${freezeAuth}`;
   }
 
@@ -158,14 +198,7 @@ function renderResult(data) {
 
   renderNews(data.news || []);
 
-  const sourceNotes = [];
-  if (data.chain === "solana") {
-    if (!data.sources.holderScan) sourceNotes.push("holder count");
-    if (!data.sources.helius) sourceNotes.push("mint/freeze authority");
-  }
-  riskNote.textContent = sourceNotes.length
-    ? `Missing ${sourceNotes.join(" & ")} data. Add API keys to improve accuracy.`
-    : "All configured data sources are active.";
+  riskNote.textContent = "Risk score is based on currently available market and on-chain data.";
 
   results.classList.remove("hidden");
 }
